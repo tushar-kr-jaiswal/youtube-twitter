@@ -26,4 +26,24 @@ const uploadOnCloudinary = async (loaclFilePath) => {
     }
 };
 
-export { uploadOnCloudinary };
+const deleteFromCloudinary = async (localFilePath, resource_type = "image") => {
+    try {
+        if (!localFilePath) return null;
+
+        const parts = localFilePath.split("/");
+        const fileWithExtension = parts.pop(); // Extract "sample.jpg"
+        const publicId = fileWithExtension.split(".").slice(0, -1).join("."); // Remove extension
+        const folder = parts.slice(parts.indexOf("upload") + 1).join("/"); // Get folder path
+        const finalURL = folder ? publicId : `${folder}/${publicId}`;
+
+        const response = await cloudinary.uploader.destroy(finalURL, {
+            resource_type: `${resource_type}`,
+        });
+        console.log("Old Image deleted Successfully");
+        return response;
+    } catch (error) {
+        return error;
+    }
+};
+
+export { uploadOnCloudinary, deleteFromCloudinary };

@@ -2,7 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+    deleteFromCloudinary,
+    uploadOnCloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import fs from "fs";
 import mongoose from "mongoose";
@@ -89,7 +92,6 @@ const registerUser = asyncHandler(async (req, res) => {
         password,
         username: username.toLowerCase(),
     });
-
     const createdUser = await User.findById(user._id).select(
         "-password -refreshToken"
     );
@@ -311,7 +313,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
-    const avatarLocalPath = req.file?.path;
+    const avatarLocalPath = req.file?.path; // new file coming from user
 
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar file is missing!");
@@ -323,6 +325,11 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Error while uploading avatar File!");
     }
 
+    const oldUser = await User.findById(req.user?._id);
+    const oldAvatar = oldUser.avatar; // Image to be deleted
+
+    console.log(oldAvatar);
+
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
@@ -333,13 +340,28 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         { new: true }
     ).select("-password");
 
+    if (!user) {
+        throw new ApiError(
+            500,
+            "Something went wrong while updating Avatar File"
+        );
+    }
+    try {
+        await deleteFromCloudinary(oldAvatar);
+    } catch (error) {
+        throw new ApiError(
+            500,
+            "Something went wrong while deleting old Avatar"
+        );
+    }
+
     return res
         .status(200)
         .json(new ApiResponse(200, user, "Avatar Image Updated SuccessFully"));
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
-    const coverImageLocalPath = req.file?.path;
+    const coverImageLocalPath = req.file?.path; // new file coming from user
 
     if (!coverImageLocalPath) {
         throw new ApiError(400, "CoverImage File is missing!");
@@ -351,6 +373,11 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Error while uploading CoverImage File!");
     }
 
+    const oldUser = await User.findById(req.user?._id);
+    const oldCoverImage = oldUser.coverImage; // Image to be deleted
+
+    console.log(oldCoverImage);
+
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
@@ -360,6 +387,21 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         },
         { new: true }
     ).select("-password");
+
+    if (!user) {
+        throw new ApiError(
+            500,
+            "Something went wrong while updating Cover Image File"
+        );
+    }
+    try {
+        await deleteFromCloudinary(oldCoverImage);
+    } catch (error) {
+        throw new ApiError(
+            500,
+            "Something went wrong while deleting old CoverImage"
+        );
+    }
 
     return res
         .status(200)
