@@ -7,7 +7,6 @@ import {
     uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
-import fs from "fs";
 import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -62,6 +61,10 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "User with email or username already exists");
     }
 
+    if (!email.includes("@")) {
+        throw new ApiError(400, "@ is required in email");
+    }
+
     const avatarLocalPath = req.files?.avatar[0]?.path;
     let coverImageLocalPath;
 
@@ -86,8 +89,14 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const user = await User.create({
         fullName,
-        avatar: avatar.url,
-        coverImage: coverImage.url || "",
+        avatar: {
+            public_id: avatar.public_id,
+            url: avatar.secure_url,
+        },
+        coverImage: {
+            public_id: coverImage?.public_id || "",
+            url: coverImage?.secure_url || "",
+        },
         email,
         password,
         username: username.toLowerCase(),
@@ -325,29 +334,32 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Error while uploading avatar File!");
     }
 
-    const oldUser = await User.findById(req.user?._id);
-    const oldAvatar = oldUser.avatar; // Image to be deleted
+    const user = await User.findById(req.user?._id).select("avatar");
+    const avatarToDelete = user.avatar.public_id; // Image to be deleted
 
-    console.log(oldAvatar);
+    console.log(avatarToDelete);
 
-    const user = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                avatar: avatar.url,
+                avatar: {
+                    public_id: avatar?.public_id,
+                    url: avatar?.url,
+                },
             },
         },
         { new: true }
     ).select("-password");
 
-    if (!user) {
+    if (!updatedUser) {
         throw new ApiError(
             500,
             "Something went wrong while updating Avatar File"
         );
     }
     try {
-        await deleteFromCloudinary(oldAvatar);
+        await deleteFromCloudinary(avatarToDelete, "image");
     } catch (error) {
         throw new ApiError(
             500,
@@ -357,7 +369,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, user, "Avatar Image Updated SuccessFully"));
+        .json(
+            new ApiResponse(
+                200,
+                updatedUser,
+                "Avatar Image Updated SuccessFully"
+            )
+        );
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
@@ -373,29 +391,32 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Error while uploading CoverImage File!");
     }
 
-    const oldUser = await User.findById(req.user?._id);
-    const oldCoverImage = oldUser.coverImage; // Image to be deleted
+    const user = await User.findById(req.user?._id).select("coverImage");
+    const coverImageToDelete = user.coverImage.public_id; // Image to be deleted
 
-    console.log(oldCoverImage);
+    console.log(coverImageToDelete);
 
-    const user = await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                coverImage: coverImage.url,
+                coverImage: {
+                    public_id: coverImage?.public_id,
+                    url: coverImage?.url,
+                },
             },
         },
         { new: true }
     ).select("-password");
 
-    if (!user) {
+    if (!updatedUser) {
         throw new ApiError(
             500,
-            "Something went wrong while updating Cover Image File"
+            "Something went wrong while updating Avatar File"
         );
     }
     try {
-        await deleteFromCloudinary(oldCoverImage);
+        await deleteFromCloudinary(coverImageToDelete, "image");
     } catch (error) {
         throw new ApiError(
             500,
@@ -405,7 +426,13 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 
     return res
         .status(200)
-        .json(new ApiResponse(200, user, "Cover Image Updated SuccessFully"));
+        .json(
+            new ApiResponse(
+                200,
+                updatedUser,
+                "Cover Image Updated SuccessFully"
+            )
+        );
 });
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
