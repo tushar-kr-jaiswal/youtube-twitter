@@ -1,3 +1,4 @@
+import path from "path";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -8,6 +9,22 @@ import {
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+
+const imageFormats = ["jpg", "jpeg", "png", "bmp", "tiff", "webp"];
+
+const validateFormat = (array, pathOfFile, format) => {
+    const allowedExtensions = [...array];
+    const filePath = pathOfFile;
+    const fileExtension = path.extname(filePath).slice(1).toLowerCase();
+
+    if (!allowedExtensions.includes(fileExtension)) {
+        throw new ApiError(
+            400,
+            `Invalid file format: ${fileExtension}. Only ${format} formats are allowed.`
+        );
+    }
+    return;
+};
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -66,6 +83,9 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     const avatarLocalPath = req.files?.avatar[0]?.path;
+
+    validateFormat(imageFormats, avatarLocalPath, "image");
+
     let coverImageLocalPath;
 
     if (!avatarLocalPath) {
@@ -79,6 +99,8 @@ const registerUser = asyncHandler(async (req, res) => {
     ) {
         coverImageLocalPath = req.files.coverImage[0].path;
     }
+
+    validateFormat(imageFormats, coverImageLocalPath, "image");
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
@@ -324,6 +346,8 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path; // new file coming from user
 
+    validateFormat(imageFormats, avatarLocalPath, "image");
+
     if (!avatarLocalPath) {
         throw new ApiError(400, "Avatar file is missing!");
     }
@@ -336,8 +360,6 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     const user = await User.findById(req.user?._id).select("avatar");
     const avatarToDelete = user.avatar.public_id; // Image to be deleted
-
-    console.log(avatarToDelete);
 
     const updatedUser = await User.findByIdAndUpdate(
         req.user?._id,
@@ -380,6 +402,8 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path; // new file coming from user
+
+    validateFormat(imageFormats, coverImageLocalPath, "image");
 
     if (!coverImageLocalPath) {
         throw new ApiError(400, "CoverImage File is missing!");
