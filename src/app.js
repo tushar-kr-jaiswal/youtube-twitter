@@ -14,11 +14,15 @@ app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 
-// importing routes
+//  routes import
 import userRouter from "./routes/user.routes.js";
+import videoRouter from "./routes/video.routes.js";
 
-// routing
+// routes declaration
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/videos", videoRouter);
+
+// video routing
 
 // http:localhost:8000/api/v1/users/register
 export { app };
