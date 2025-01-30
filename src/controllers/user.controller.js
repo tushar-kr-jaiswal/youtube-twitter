@@ -418,7 +418,7 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user?._id).select("coverImage");
     const coverImageToDelete = user.coverImage.public_id; // Image to be deleted
 
-    console.log(coverImageToDelete);
+    // console.log(coverImageToDelete);
 
     const updatedUser = await User.findByIdAndUpdate(
         req.user?._id,
