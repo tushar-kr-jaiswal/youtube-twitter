@@ -42,8 +42,115 @@ const validateFormat = (array, pathOfFile, format) => {
 };
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+    // validate the userId
+    // integrate the pipelines to get the video's owner's username and "avatar.url"
+    // use the options like limit and page
+    //  then use the aggregatePaginate method
+    const {
+        page = 1,
+        limit = 10,
+        query,
+        sortBy = "relevance",
+        sortType = "desc",
+        userId,
+    } = req.query;
     //TODO: get all videos based on query, sort, pagination
+
+    // console.log(userId);
+
+    const pipeline = []; // dynamically push methods in it
+
+    if (!query) {
+        throw new ApiError(404, "Query not found!");
+    }
+
+    if (query) {
+        pipeline.push({
+            $search: {
+                index: "default",
+                text: {
+                    query: query,
+                    path: ["title", "description"],
+                },
+            },
+        });
+    }
+
+    if (!isValidObjectId(userId)) {
+        throw new ApiError(400, "Invalid userId");
+    }
+
+    pipeline.push({
+        $match: {
+            owner: new mongoose.Types.ObjectId(userId),
+        },
+    });
+
+    pipeline.push({
+        $match: {
+            isPublished: true,
+        },
+    });
+
+    if (sortBy && sortType) {
+        pipeline.push({
+            $sort: {
+                [sortBy]: sortType === "asc" ? 1 : -1,
+            },
+        });
+    } else {
+        pipeline.push({ $sort: { createdAt: -1 } });
+    }
+
+    pipeline.push(
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "ownerDetails",
+                pipeline: [
+                    {
+                        $project: {
+                            username: 1,
+                            "avatar.url": 1,
+                        },
+                    },
+                ],
+            },
+        },
+        {
+            $unwind: "$ownerDetails",
+        }
+    );
+
+    const videoAggregate = await Video.aggregate(pipeline);
+
+    // console.log("videoAggregate --- ", videoAggregate);
+
+    const options = {
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+    };
+
+    const video = await Video.aggregatePaginate(videoAggregate, options);
+
+    // console.log("video --- ", video);
+
+    if (!video || video?.docs.length === 0) {
+        return res
+            .status(200)
+            .json(new ApiResponse(200, {}, "No vidoes are available"));
+    }
+
+    if (video?.length <= 0) {
+        return res
+            .status(200)
+            .json(new ApiResponse(200, {}, "No more videos are available"));
+    }
+    return res
+        .status(200)
+        .json(new ApiResponse(200, video, "Videos fetched successfully"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
