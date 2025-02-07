@@ -58,6 +58,13 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
     // console.log(userId);
 
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+
+    if (isNaN(pageNum) || isNaN(limitNum) || pageNum < 1 || limitNum < 1) {
+        throw new ApiError(400, "Invalid page or limit value");
+    }
+
     const pipeline = []; // dynamically push methods in it
 
     if (!query) {
@@ -129,28 +136,28 @@ const getAllVideos = asyncHandler(async (req, res) => {
     // console.log("videoAggregate --- ", videoAggregate);
 
     const options = {
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
+        page: pageNum,
+        limit: limitNum,
     };
 
-    const video = await Video.aggregatePaginate(videoAggregate, options);
+    const videos = await Video.aggregatePaginate(videoAggregate, options);
 
     // console.log("video --- ", video);
 
-    if (!video || video?.docs.length === 0) {
+    if (!videos || videos?.docs.length === 0) {
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "No vidoes are available"));
     }
 
-    if (video?.length <= 0) {
+    if (videos?.length <= 0) {
         return res
             .status(200)
             .json(new ApiResponse(200, {}, "No more videos are available"));
     }
     return res
         .status(200)
-        .json(new ApiResponse(200, video, "Videos fetched successfully"));
+        .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 const publishAVideo = asyncHandler(async (req, res) => {
