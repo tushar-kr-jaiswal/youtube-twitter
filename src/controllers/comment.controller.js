@@ -18,14 +18,14 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const video = await Video.exists({ _id: videoId });
 
     if (!video) {
-        throw new ApiError(404, "Video not found");
+        throw new ApiError(404, "The requested video was not found.");
     }
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
 
     if (isNaN(pageNum) || isNaN(limitNum) || pageNum < 1 || limitNum < 1) {
-        throw new ApiError(400, "Invalid page or limit value");
+        throw new ApiError(400, "Invalid pagination parameters");
     }
 
     const pipeline = [
@@ -76,7 +76,13 @@ const getVideoComments = asyncHandler(async (req, res) => {
     if (!comments || comments?.docs.length === 0) {
         return res
             .status(200)
-            .json(new ApiResponse(200, {}, "No comments are available"));
+            .json(
+                new ApiResponse(
+                    200,
+                    {},
+                    "No comments available for this video."
+                )
+            );
     }
 
     return res
@@ -90,17 +96,20 @@ const addComment = asyncHandler(async (req, res) => {
     const { content } = req.body;
 
     if (!isValidObjectId(videoId)) {
-        throw new ApiError(400, "Invalid videoId");
+        throw new ApiError(400, "Invalid video ID format.");
     }
 
     if (!content) {
-        throw new ApiError(400, "Content is required");
+        throw new ApiError(400, "Comment content is required.");
     }
 
     const video = await Video.findById(videoId);
 
     if (!video) {
-        throw new ApiError(404, "Video not Found");
+        throw new ApiError(
+            404,
+            "The video you are trying to comment on was not found."
+        );
     }
 
     const comment = await Comment.create({
@@ -110,7 +119,10 @@ const addComment = asyncHandler(async (req, res) => {
     });
 
     if (!comment) {
-        throw new ApiError(500, "Something went wrong while commenting");
+        throw new ApiError(
+            500,
+            "An unexpected error occurred while adding the comment."
+        );
     }
 
     return res
@@ -125,21 +137,24 @@ const updateComment = asyncHandler(async (req, res) => {
     const { content } = req.body;
 
     if (!isValidObjectId(commentId)) {
-        throw new ApiError(400, "Invalid commentId");
+        throw new ApiError(400, "Invalid comment ID format.");
     }
 
     if (!content) {
-        throw new ApiError(400, "Content is required");
+        throw new ApiError(400, "Updated comment content is required.");
     }
 
     const comment = await Comment.findById(commentId);
 
     if (!comment) {
-        throw new ApiError(400, "Comment Not Found");
+        throw new ApiError(
+            404,
+            "The comment you are trying to update was not found."
+        );
     }
 
     if (comment?.owner?.toString() !== req.user?._id.toString()) {
-        throw new ApiError(403, "Only owner can edit the comment.");
+        throw new ApiError(403, "You are not authorized to edit this comment.");
     }
 
     const updatedComment = await Comment.findByIdAndUpdate(
@@ -155,7 +170,7 @@ const updateComment = asyncHandler(async (req, res) => {
     if (!updatedComment) {
         throw new ApiError(
             500,
-            "Something went wrong while updating the comment"
+            "An unexpected error occurred while updating the comment."
         );
     }
 
@@ -171,17 +186,23 @@ const deleteComment = asyncHandler(async (req, res) => {
     const { commentId } = req.params;
 
     if (!isValidObjectId(commentId)) {
-        throw new ApiError(400, "Invalid CommentId");
+        throw new ApiError(400, "Invalid comment ID format.");
     }
 
     const comment = await Comment.findById(commentId);
 
     if (!comment) {
-        throw new ApiError(404, "Comment not found");
+        throw new ApiError(
+            404,
+            "The comment you are trying to delete was not found."
+        );
     }
 
     if (comment?.owner?.toString() !== req.user?._id.toString()) {
-        throw new ApiError(403, "Only owner can delete the comment.");
+        throw new ApiError(
+            403,
+            "You are not authorized to delete this comment."
+        );
     }
 
     await Comment.findByIdAndDelete(commentId);
