@@ -377,67 +377,82 @@ const getVideoById = asyncHandler(async (req, res) => {
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
 
+    // Validate videoId
     if (!isValidObjectId(videoId)) {
         throw new ApiError(400, "Invalid videoId");
     }
 
     const { title, description } = req.body;
 
+    // Validate title and description
     if (
-        ![title, description].every(
-            (field) => typeof field === "string" && field.trim() !== ""
-        )
+        !title ||
+        typeof title !== "string" ||
+        !description ||
+        typeof description !== "string"
     ) {
         throw new ApiError(400, "Title and description are required");
     }
 
+    // Find video
     const video = await Video.findById(videoId);
-
     if (!video) {
         throw new ApiError(404, "Video not found");
     }
 
-    if (video.owner.toString() !== req.user._id.toString()) {
+    // Check if the user is the owner
+    if (
+        !req.user ||
+        !req.user._id ||
+        video.owner.toString() !== req.user._id.toString()
+    ) {
         throw new ApiError(
             403,
             "You can't edit this video as you are not the owner"
         );
     }
 
-    const thumbnailToDelete = video.thumbnail?.public_id;
-    const thumbnailLocalFilePath = req.file?.path;
+    // Store the old thumbnail public ID (to delete later)
+    const oldThumbnailPublicId = video.thumbnail?.public_id;
+    const newThumbnailPath = req.file?.path;
 
-    if (thumbnailLocalFilePath) {
-        validateFormat(imageFormats, thumbnailLocalFilePath, "image");
+    // If a new thumbnail is uploaded, validate and upload it
+    if (newThumbnailPath) {
+        validateFormat(imageFormats, newThumbnailPath, "image");
 
-        let thumbnail;
+        let newThumbnail;
         try {
-            thumbnail = await uploadOnCloudinary(thumbnailLocalFilePath);
-            if (!thumbnail) throw new Error();
+            newThumbnail = await uploadOnCloudinary(newThumbnailPath, "image");
+            if (!newThumbnail?.url) throw new Error();
         } catch (error) {
             throw new ApiError(400, "Unable to update thumbnail");
         }
 
-        // Delete local file after upload
-        fs.unlinkSync(thumbnailLocalFilePath);
-
+        // Assign the new thumbnail to the video
         video.thumbnail = {
-            url: thumbnail.url,
-            public_id: thumbnail.public_id,
+            url: newThumbnail.url,
+            public_id: newThumbnail.public_id,
         };
+
+        // Delete the old thumbnail from Cloudinary (only if new one was uploaded successfully)
+        if (oldThumbnailPublicId) {
+            await deleteFromCloudinary(oldThumbnailPublicId);
+        }
+
+        // Delete the local file after successful upload
+        fs.unlink(newThumbnailPath, (err) => {
+            if (err) console.error("Failed to delete local file:", err);
+        });
     }
 
+    // Update title and description
     video.title = title;
     video.description = description;
 
+    // Save the updated video
     const updatedVideo = await video.save();
-
     if (!updatedVideo) {
         throw new ApiError(500, "Failed to update video, please try again");
-    }
-
-    if (thumbnailToDelete) {
-        await deleteFromCloudinary(thumbnailToDelete);
     }
 
     return res
