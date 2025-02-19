@@ -38,7 +38,6 @@ const userSchema = new Schema(
                 public_id: String,
                 url: String,
             }, // Cloudinary URL
-            requried: true,
         },
         watchHistory: [
             {
