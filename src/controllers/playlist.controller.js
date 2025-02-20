@@ -97,7 +97,9 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     const playlist = await Playlist.findById(playlistId);
 
     if (!playlist) {
-        throw new ApiError(404, "Playlist Not Found");
+        return res
+            .status(404)
+            .json(new ApiResponse(404, playlist, "Playlist not Found."));
     }
 
     const playlistVideos = await Playlist.aggregate([
@@ -172,6 +174,12 @@ const getPlaylistById = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Unable to fetch playlist by Id.");
     }
     // console.log("Playlist Videos --- ", playlistVideos);
+
+    if (playlistVideos.length === 0) {
+        return res
+            .status(200)
+            .json(new ApiResponse(200, playlistVideos, "Playlist is empty."));
+    }
 
     return res
         .status(200)
