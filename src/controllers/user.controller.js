@@ -60,11 +60,11 @@ const registerUser = asyncHandler(async (req, res) => {
     //  remove password and refreshToken from user created
     //  return res
 
-    const { username, email, password, fullName } = req.body;
+    const { username, email, password, fullName } = req.body;   
 
     if (
         [username, email, password, fullName].some(
-            (field) => field?.trim === ""
+            (field) => !field || field?.trim() === ""
         )
     ) {
         throw new ApiError(400, "All fields are required");
